@@ -5,7 +5,7 @@ services:
     name: shared-expenses-api
     runtime: python
     rootDir: backend
-    buildCommand: "./build.sh"
+    buildCommand: "bash build.sh"
     startCommand: "gunicorn config.wsgi:application"
     envVars:
       - key: PYTHON_VERSION
