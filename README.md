@@ -75,14 +75,16 @@ the exact row that triggers it.
 ## Deploy (all free tiers, no credit card)
 - **Postgres → Neon:** create a free project at [neon.tech](https://neon.tech)
   (no card) and copy its connection string.
-- **Backend → Render:** the repo includes [`render.yaml`](render.yaml). Create a
-  Blueprint from the repo; it provisions a free web service, runs
-  `backend/build.sh` (install, collectstatic, migrate), and starts gunicorn. Set
-  `DATABASE_URL` to the Neon string. After the frontend is up, set
-  `CORS_ALLOWED_ORIGINS` / `CSRF_TRUSTED_ORIGINS` to the Vercel URL. Set
-  `ANTHROPIC_API_KEY` to enable the LLM feature.
+- **Backend → Koyeb:** deploy the repo's [`Dockerfile`](Dockerfile) as a Koyeb
+  web service (free Hobby tier, no card). The image installs deps, runs
+  collectstatic, migrates on boot, and serves via gunicorn. Set env vars:
+  `DEBUG=False`, `SECRET_KEY`, `DATABASE_URL` (Neon), `ALLOWED_HOSTS=.koyeb.app`,
+  `FX_PROVIDER_URL`. After the frontend is up, set `CORS_ALLOWED_ORIGINS` /
+  `CSRF_TRUSTED_ORIGINS` to the Vercel URL. Optional `ANTHROPIC_API_KEY` enables
+  the LLM feature. (`render.yaml` is also included for Render, which now requires
+  a card.)
 - **Frontend → Vercel:** import the repo, root directory `frontend`, framework
-  Vite. Set `VITE_API_BASE` to the Render API URL.
+  Vite. Set `VITE_API_BASE` to the Koyeb API URL.
 
 ## AI used
 Anthropic **Claude** (via Claude Code, model Opus 4.8) as the primary development

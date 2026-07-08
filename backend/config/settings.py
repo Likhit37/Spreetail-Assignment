@@ -123,13 +123,16 @@ STORAGES = {
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Production hardening (only when DEBUG is off, i.e. on Render behind HTTPS).
+# Production hardening (only when DEBUG is off; the PaaS edge terminates HTTPS).
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-    SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-    # Render's external hostname is a valid CSRF origin.
+    # Off by default: the platform edge already enforces HTTPS, and an app-level
+    # redirect can 301 the platform's plain-HTTP health check into a failure.
+    # Enable explicitly (SECURE_SSL_REDIRECT=True) only if the host needs it.
+    SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", False)
+    # Render injects its external hostname; add it as a trusted CSRF origin.
     if _render_host:
         CSRF_TRUSTED_ORIGINS.append(f"https://{_render_host}")
 
