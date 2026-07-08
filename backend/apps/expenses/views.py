@@ -11,6 +11,7 @@ from .serializers import (
     SettlementSerializer,
 )
 from .services.balances import member_ledger, net_balances, simplify
+from .services.explain import explain_balance
 
 
 class GroupViewSet(viewsets.ModelViewSet):
@@ -55,6 +56,16 @@ class GroupViewSet(viewsets.ModelViewSet):
         group = self.get_object()
         member = get_object_or_404(Member, group=group, id=member_id)
         return Response(member_ledger(group, member))
+
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path="members/(?P<member_id>[^/.]+)/explain",
+    )
+    def explain(self, request, pk=None, member_id=None):
+        group = self.get_object()
+        member = get_object_or_404(Member, group=group, id=member_id)
+        return Response(explain_balance(group, member))
 
 
 class MemberViewSet(viewsets.ModelViewSet):
