@@ -123,6 +123,16 @@ STORAGES = {
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# Production hardening (only when DEBUG is off, i.e. on Render behind HTTPS).
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    # Render's external hostname is a valid CSRF origin.
+    if _render_host:
+        CSRF_TRUSTED_ORIGINS.append(f"https://{_render_host}")
+
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (

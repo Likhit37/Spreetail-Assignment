@@ -1,0 +1,35 @@
+# Render blueprint: Django API + managed Postgres.
+# The frontend deploys separately to Vercel (see README).
+services:
+  - type: web
+    name: shared-expenses-api
+    runtime: python
+    rootDir: backend
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn config.wsgi:application"
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.8"
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: shared-expenses-db
+          property: connectionString
+      - key: ALLOWED_HOSTS
+        # Render also injects RENDER_EXTERNAL_HOSTNAME automatically.
+        value: ".onrender.com"
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false # set to your Vercel URL after the frontend deploys
+      - key: CSRF_TRUSTED_ORIGINS
+        sync: false
+      - key: FX_PROVIDER_URL
+        value: "https://api.frankfurter.dev/v1"
+      - key: ANTHROPIC_API_KEY
+        sync: false # optional; enables the LLM explanation feature
+
+databases:
+  - name: shared-expenses-db
+    plan: free

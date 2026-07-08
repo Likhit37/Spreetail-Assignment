@@ -1,0 +1,218 @@
+{
+  "file": "../expenses_export assigbment annex.xlsx",
+  "total_rows": 42,
+  "rows_with_anomalies": 21,
+  "distinct_anomaly_types": 16,
+  "anomaly_counts": {
+    "DUPLICATE_EXACT": 1,
+    "NAME_ALIAS": 3,
+    "SUBUNIT_PRECISION": 1,
+    "MISSING_PAYER": 1,
+    "SETTLEMENT_AS_EXPENSE": 2,
+    "PERCENTAGE_SUM_INVALID": 2,
+    "FOREIGN_CURRENCY": 4,
+    "NON_MEMBER_PARTICIPANT": 1,
+    "DUPLICATE_CONFLICT": 2,
+    "NEGATIVE_AMOUNT": 1,
+    "IMPOSSIBLE_DATE": 1,
+    "MISSING_CURRENCY": 1,
+    "ZERO_AMOUNT": 1,
+    "AMBIGUOUS_DATE": 1,
+    "MEMBERSHIP_DATE_MISMATCH": 1,
+    "SPLIT_TYPE_DETAIL_CONFLICT": 1
+  },
+  "findings": [
+    {
+      "row": 5,
+      "description": "dinner - marina bites",
+      "code": "DUPLICATE_EXACT",
+      "severity": "warning",
+      "message": "Exact duplicate of an earlier row.",
+      "action": "drop duplicate"
+    },
+    {
+      "row": 8,
+      "description": "Movie night snacks",
+      "code": "NAME_ALIAS",
+      "severity": "info",
+      "message": "Non-canonical spelling(s): priya.",
+      "action": "normalise name"
+    },
+    {
+      "row": 9,
+      "description": "Cylinder refill",
+      "code": "SUBUNIT_PRECISION",
+      "severity": "info",
+      "message": "Amount 899.995 has sub-paise precision.",
+      "action": "round to 2 dp"
+    },
+    {
+      "row": 10,
+      "description": "Groceries DMart",
+      "code": "NAME_ALIAS",
+      "severity": "info",
+      "message": "Non-canonical spelling(s): Priya S.",
+      "action": "normalise name"
+    },
+    {
+      "row": 12,
+      "description": "House cleaning supplies",
+      "code": "MISSING_PAYER",
+      "severity": "blocker",
+      "message": "No payer recorded for this expense.",
+      "action": "hold row until a payer is chosen"
+    },
+    {
+      "row": 13,
+      "description": "Rohan paid Aisha back",
+      "code": "SETTLEMENT_AS_EXPENSE",
+      "severity": "warning",
+      "message": "This is a payment between two people, not a shared expense.",
+      "action": "reclassify as settlement"
+    },
+    {
+      "row": 14,
+      "description": "Pizza Friday",
+      "code": "PERCENTAGE_SUM_INVALID",
+      "severity": "warning",
+      "message": "Percentages sum to 110%, not 100%.",
+      "action": "normalise to 100%"
+    },
+    {
+      "row": 19,
+      "description": "Goa villa booking",
+      "code": "FOREIGN_CURRENCY",
+      "severity": "info",
+      "message": "Amount is in USD, not INR.",
+      "action": "convert via dated FX rate"
+    },
+    {
+      "row": 20,
+      "description": "Beach shack lunch",
+      "code": "FOREIGN_CURRENCY",
+      "severity": "info",
+      "message": "Amount is in USD, not INR.",
+      "action": "convert via dated FX rate"
+    },
+    {
+      "row": 22,
+      "description": "Parasailing",
+      "code": "FOREIGN_CURRENCY",
+      "severity": "info",
+      "message": "Amount is in USD, not INR.",
+      "action": "convert via dated FX rate"
+    },
+    {
+      "row": 22,
+      "description": "Parasailing",
+      "code": "NON_MEMBER_PARTICIPANT",
+      "severity": "warning",
+      "message": "'Dev's friend Kabir' is not a flat member.",
+      "action": "add as guest"
+    },
+    {
+      "row": 23,
+      "description": "Dinner at Thalassa",
+      "code": "DUPLICATE_CONFLICT",
+      "severity": "warning",
+      "message": "Same event logged more than once with different amount/payer.",
+      "action": "keep first-logged, user confirms"
+    },
+    {
+      "row": 24,
+      "description": "Thalassa dinner",
+      "code": "DUPLICATE_CONFLICT",
+      "severity": "warning",
+      "message": "Same event logged more than once with different amount/payer.",
+      "action": "keep first-logged, user confirms"
+    },
+    {
+      "row": 25,
+      "description": "Parasailing refund",
+      "code": "FOREIGN_CURRENCY",
+      "severity": "info",
+      "message": "Amount is in USD, not INR.",
+      "action": "convert via dated FX rate"
+    },
+    {
+      "row": 25,
+      "description": "Parasailing refund",
+      "code": "NEGATIVE_AMOUNT",
+      "severity": "warning",
+      "message": "Amount is negative (-30).",
+      "action": "treat as refund (negative expense)"
+    },
+    {
+      "row": 26,
+      "description": "Airport cab",
+      "code": "IMPOSSIBLE_DATE",
+      "severity": "warning",
+      "message": "Year 2014 is outside the group's active period.",
+      "action": "correct year to 2026"
+    },
+    {
+      "row": 26,
+      "description": "Airport cab",
+      "code": "NAME_ALIAS",
+      "severity": "info",
+      "message": "Non-canonical spelling(s): rohan .",
+      "action": "normalise name"
+    },
+    {
+      "row": 27,
+      "description": "Groceries DMart",
+      "code": "MISSING_CURRENCY",
+      "severity": "warning",
+      "message": "Currency was blank.",
+      "action": "assume INR"
+    },
+    {
+      "row": 30,
+      "description": "Dinner order Swiggy",
+      "code": "ZERO_AMOUNT",
+      "severity": "warning",
+      "message": "Amount is zero.",
+      "action": "skip row"
+    },
+    {
+      "row": 31,
+      "description": "Weekend brunch",
+      "code": "PERCENTAGE_SUM_INVALID",
+      "severity": "warning",
+      "message": "Percentages sum to 110%, not 100%.",
+      "action": "normalise to 100%"
+    },
+    {
+      "row": 33,
+      "description": "Deep cleaning service",
+      "code": "AMBIGUOUS_DATE",
+      "severity": "warning",
+      "message": "Date 2026-05-04 is out of order with its neighbours.",
+      "action": "ask user to confirm date"
+    },
+    {
+      "row": 35,
+      "description": "Groceries BigBasket",
+      "code": "MEMBERSHIP_DATE_MISMATCH",
+      "severity": "warning",
+      "message": "Meera not in the flat on 2026-04-02.",
+      "action": "drop inactive members from split"
+    },
+    {
+      "row": 37,
+      "description": "Sam deposit share",
+      "code": "SETTLEMENT_AS_EXPENSE",
+      "severity": "warning",
+      "message": "This is a payment between two people, not a shared expense.",
+      "action": "reclassify as settlement"
+    },
+    {
+      "row": 41,
+      "description": "Furniture for common room",
+      "code": "SPLIT_TYPE_DETAIL_CONFLICT",
+      "severity": "warning",
+      "message": "split_type is 'equal' but per-person shares were supplied.",
+      "action": "use split_type, ignore details"
+    }
+  ]
+}
