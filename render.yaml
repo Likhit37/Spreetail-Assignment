@@ -1,5 +1,6 @@
-# Render blueprint: Django API + managed Postgres.
-# The frontend deploys separately to Vercel (see README).
+# Render blueprint: Django API (free web service, no card required).
+# Postgres is hosted externally on Neon (free, no card) and supplied via
+# DATABASE_URL. The frontend deploys separately to Vercel (see README).
 services:
   - type: web
     name: shared-expenses-api
@@ -15,9 +16,7 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: DATABASE_URL
-        fromDatabase:
-          name: shared-expenses-db
-          property: connectionString
+        sync: false # paste your Neon Postgres connection string
       - key: ALLOWED_HOSTS
         # Render also injects RENDER_EXTERNAL_HOSTNAME automatically.
         value: ".onrender.com"
@@ -29,7 +28,3 @@ services:
         value: "https://api.frankfurter.dev/v1"
       - key: ANTHROPIC_API_KEY
         sync: false # optional; enables the LLM explanation feature
-
-databases:
-  - name: shared-expenses-db
-    plan: free

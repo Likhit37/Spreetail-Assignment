@@ -72,13 +72,15 @@ python manage.py test          # 26 tests: split math, balances, detectors, comm
 Detector tests run against the **real, unedited** file, pinning each anomaly to
 the exact row that triggers it.
 
-## Deploy
-- **Backend + Postgres → Render:** the repo includes [`render.yaml`](render.yaml).
-  Create a Blueprint from the repo; it provisions the web service and a free
-  Postgres, runs `backend/build.sh` (install, collectstatic, migrate), and starts
-  gunicorn. After the frontend is up, set `CORS_ALLOWED_ORIGINS` /
-  `CSRF_TRUSTED_ORIGINS` to the Vercel URL. Set `ANTHROPIC_API_KEY` to enable the
-  LLM feature.
+## Deploy (all free tiers, no credit card)
+- **Postgres → Neon:** create a free project at [neon.tech](https://neon.tech)
+  (no card) and copy its connection string.
+- **Backend → Render:** the repo includes [`render.yaml`](render.yaml). Create a
+  Blueprint from the repo; it provisions a free web service, runs
+  `backend/build.sh` (install, collectstatic, migrate), and starts gunicorn. Set
+  `DATABASE_URL` to the Neon string. After the frontend is up, set
+  `CORS_ALLOWED_ORIGINS` / `CSRF_TRUSTED_ORIGINS` to the Vercel URL. Set
+  `ANTHROPIC_API_KEY` to enable the LLM feature.
 - **Frontend → Vercel:** import the repo, root directory `frontend`, framework
   Vite. Set `VITE_API_BASE` to the Render API URL.
 
