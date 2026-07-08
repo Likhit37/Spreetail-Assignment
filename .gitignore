@@ -1,0 +1,24 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+db.sqlite3
+backend/staticfiles/
+.env
+*.env
+!.env.example
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+
+# Assignment source docs kept in repo: keep the xlsx + assignment PDF.
+# mail.pdf contains personal email data — do NOT commit.
+mail.pdf
