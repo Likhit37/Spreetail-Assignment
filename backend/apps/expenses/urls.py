@@ -1,5 +1,16 @@
-from django.urls import path
+from rest_framework.routers import DefaultRouter
 
-urlpatterns = [
-    # Filled in task 2 (groups, members, expenses, balances, settlements).
-]
+from .views import (
+    ExpenseViewSet,
+    GroupViewSet,
+    MemberViewSet,
+    SettlementViewSet,
+)
+
+router = DefaultRouter()
+router.register("groups", GroupViewSet, basename="group")
+router.register("members", MemberViewSet, basename="member")
+router.register("expenses", ExpenseViewSet, basename="expense")
+router.register("settlements", SettlementViewSet, basename="settlement")
+
+urlpatterns = router.urls
