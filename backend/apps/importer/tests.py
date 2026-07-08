@@ -4,13 +4,20 @@ Each test pins one anomaly to the specific row that triggers it, so if a
 detector regresses we know exactly which flatmate complaint broke.
 """
 
+import datetime as dt
+from decimal import Decimal
 from pathlib import Path
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
 
+from apps.expenses.models import Expense, ExpenseSplit, Group, Member
+from apps.expenses.services.balances import net_balances
+
+from .models import FxRate
 from .services import anomalies as A
 from .services.detectors import analyze
 from .services.parsing import parse_upload
+from .services.pipeline import build_report, commit_batch, stage_batch
 from .services.roster import default_roster
 
 XLSX = Path(__file__).resolve().parents[3] / "expenses_export assigbment annex.xlsx"
@@ -100,3 +107,68 @@ class DetectorCoverageTests(SimpleTestCase):
 
     def test_kabir_is_non_member(self):
         self.assertIn(A.NON_MEMBER_PARTICIPANT, self.by_row.get(22, set()))
+
+
+class ImportCommitTests(TestCase):
+    """Stage + commit the whole real file and check the invariants."""
+
+    def setUp(self):
+        # Seed FX for the trip's USD dates so the test never hits the network.
+        for day in (9, 10, 11, 12):
+            FxRate.objects.create(
+                on_date=dt.date(2026, 3, day),
+                base="USD",
+                quote="INR",
+                rate=Decimal("85"),
+                source="test",
+            )
+        self.group = Group.objects.create(name="Flat 4B")
+        self.roster = default_roster()
+        with open(XLSX, "rb") as f:
+            rows = analyze(parse_upload(f, "expenses.xlsx"), self.roster)
+        self.batch = stage_batch(self.group, "expenses.xlsx", None, rows)
+
+    def test_report_lists_all_anomaly_types(self):
+        report = build_report(self.batch)
+        self.assertEqual(report["total_rows"], 42)
+        self.assertGreaterEqual(report["distinct_anomaly_types"], 12)
+
+    def test_commit_produces_expected_row_counts(self):
+        result = commit_batch(self.batch, self.roster)["committed"]
+        # 36 expenses, 2 settlements, 4 skipped (1 exact dup, 1 conflict dup,
+        # 1 zero-amount, 1 payer-less row).
+        self.assertEqual(result["expenses"], 36)
+        self.assertEqual(result["settlements"], 2)
+        self.assertEqual(result["skipped"], 4)
+
+    def test_balances_sum_to_zero(self):
+        commit_batch(self.batch, self.roster)
+        total = sum(net_balances(self.group).values())
+        self.assertEqual(total, Decimal("0.00"))
+
+    def test_february_rent_split_is_hand_verifiable(self):
+        # Row 1: Aisha pays 48000, equal among 4 -> each owes 12000 exactly.
+        commit_batch(self.batch, self.roster)
+        rent = Expense.objects.get(description="February rent")
+        self.assertEqual(rent.amount_inr, Decimal("48000.00"))
+        shares = {s.member.name: s.amount_inr for s in rent.splits.all()}
+        self.assertEqual(shares["Rohan"], Decimal("12000.00"))
+        self.assertEqual(sum(shares.values()), Decimal("48000.00"))
+
+    def test_meera_dropped_from_april_groceries(self):
+        # Row 35: April 2 groceries listed Meera, who had left. She must not
+        # get a split for it.
+        commit_batch(self.batch, self.roster)
+        exp = Expense.objects.filter(
+            description="Groceries BigBasket", date=dt.date(2026, 4, 2)
+        ).first()
+        split_members = {s.member.name for s in exp.splits.all()}
+        self.assertNotIn("Meera", split_members)
+
+    def test_usd_expense_converted_with_stored_rate(self):
+        # Row 19: Goa villa 540 USD * 85 = 45900 INR.
+        commit_batch(self.batch, self.roster)
+        villa = Expense.objects.get(description="Goa villa booking")
+        self.assertEqual(villa.currency, "USD")
+        self.assertEqual(villa.fx_rate, Decimal("85"))
+        self.assertEqual(villa.amount_inr, Decimal("45900.00"))

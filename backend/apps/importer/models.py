@@ -14,6 +14,28 @@ from django.conf import settings
 from django.db import models
 
 
+class FxRate(models.Model):
+    """Cached FX rate for one (date, base->quote) pair.
+
+    We persist every rate we fetch so a re-import produces identical rupee
+    values and so the live-session numbers never depend on a network call at
+    demo time. `source` records where the rate came from (api vs fallback).
+    """
+
+    on_date = models.DateField()
+    base = models.CharField(max_length=3)
+    quote = models.CharField(max_length=3)
+    rate = models.DecimalField(max_digits=12, decimal_places=6)
+    source = models.CharField(max_length=20, default="frankfurter")
+    fetched_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("on_date", "base", "quote")
+
+    def __str__(self) -> str:
+        return f"{self.on_date} {self.base}->{self.quote} = {self.rate}"
+
+
 class ImportStatus(models.TextChoices):
     PENDING = "pending", "Pending review"
     COMMITTED = "committed", "Committed"
