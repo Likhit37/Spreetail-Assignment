@@ -37,14 +37,25 @@ def parse_xlsx(file_obj) -> list[dict]:
 
     wb = load_workbook(file_obj, data_only=True)
     ws = wb[wb.sheetnames[0]]
-    rows = list(ws.iter_rows(values_only=True))
+    rows = list(ws.iter_rows())  # cell objects, so we can read number_format
     if not rows:
         return []
-    header = [str(h).strip() if h is not None else "" for h in rows[0]]
+    header = [
+        str(c.value).strip() if c.value is not None else "" for c in rows[0]
+    ]
+    try:
+        date_idx = header.index("date")
+    except ValueError:
+        date_idx = 0
     out = []
     for i, row in enumerate(rows[1:], start=1):
-        raw = {header[j]: _cell(row[j]) for j in range(len(header))}
-        out.append({"row_number": i, "raw": raw})
+        raw = {header[j]: _cell(row[j].value) for j in range(len(header))}
+        # The date cell's Excel number format disambiguates weird dates
+        # (e.g. a month-year format hides the day). Detectors use it.
+        date_format = row[date_idx].number_format if date_idx < len(row) else None
+        out.append(
+            {"row_number": i, "raw": raw, "meta": {"date_format": date_format}}
+        )
     return out
 
 
@@ -55,7 +66,13 @@ def parse_csv(file_obj) -> list[dict]:
     reader = csv.DictReader(io.StringIO(data))
     out = []
     for i, row in enumerate(reader, start=1):
-        out.append({"row_number": i, "raw": {k: (v if v != "" else None) for k, v in row.items()}})
+        out.append(
+            {
+                "row_number": i,
+                "raw": {k: (v if v != "" else None) for k, v in row.items()},
+                "meta": {},  # CSV carries no cell-format info
+            }
+        )
     return out
 
 

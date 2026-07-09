@@ -182,18 +182,46 @@ def detect_subunit_precision(ctx, roster):
 
 def detect_impossible_date(ctx, roster):
     d = ctx["cleaned"].get("date")
-    if d and d.year != 2026:
-        suggested = d.replace(year=2026)
-        ctx["cleaned"]["date"] = suggested
-        ctx["anomalies"].append(
-            A.Anomaly(
-                A.IMPOSSIBLE_DATE,
-                "warning",
-                f"Year {d.year} is outside the group's active period.",
-                f"Assumed a typo for {suggested.isoformat()}.",
-                "correct year to 2026",
+    if not d or d.year == 2026:
+        return
+
+    fmt = (ctx.get("meta", {}).get("date_format") or "").lower()
+    # A month-year format (has a year token, no day token) means the cell never
+    # stored a real day — Excel defaulted it to the 1st. The two-digit "year"
+    # the user typed (e.g. 2014 -> "14") is really the intended day of month.
+    month_year_format = "y" in fmt and "d" not in fmt
+    day_guess = d.year % 100
+    if month_year_format and 1 <= day_guess <= 28:
+        try:
+            suggested = dt.date(2026, d.month, day_guess)
+            reason = (
+                f"Cell is month-year formatted ('{ctx['meta']['date_format']}'), "
+                f"so '{day_guess}' is the day, not the year."
             )
+            action = "read day from month-year format; year -> 2026"
+        except ValueError:
+            suggested, reason, action = _year_fix(d)
+    else:
+        suggested, reason, action = _year_fix(d)
+
+    ctx["cleaned"]["date"] = suggested
+    ctx["anomalies"].append(
+        A.Anomaly(
+            A.IMPOSSIBLE_DATE,
+            "warning",
+            f"Date {d.isoformat()} is outside the group's active period.",
+            f"{reason} Corrected to {suggested.isoformat()}.",
+            action,
         )
+    )
+
+
+def _year_fix(d):
+    return (
+        d.replace(year=2026),
+        f"Year {d.year} looks like a typo.",
+        "correct year to 2026",
+    )
 
 
 def detect_split_type_detail_conflict(ctx, roster):
@@ -461,6 +489,7 @@ def analyze(raw_rows, roster: Roster | None = None):
         ctx = {
             "row_number": rr["row_number"],
             "raw": raw,
+            "meta": rr.get("meta", {}),
             "kind": "expense",
             "status": "clean",
             "anomalies": [],

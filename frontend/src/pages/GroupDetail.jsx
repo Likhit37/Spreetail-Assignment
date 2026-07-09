@@ -14,6 +14,7 @@ export default function GroupDetail() {
   const [settlements, setSettlements] = useState([]);
   const [tab, setTab] = useState("balances");
   const [drill, setDrill] = useState(null);
+  const [expDetail, setExpDetail] = useState(null); // expense clicked in the table
   const [modal, setModal] = useState(null); // 'expense' | 'settle' | 'members'
   const [settleSuggestion, setSettleSuggestion] = useState(null);
   const [error, setError] = useState("");
@@ -204,7 +205,12 @@ export default function GroupDetail() {
               </thead>
               <tbody>
                 {expenses.map((e) => (
-                  <tr key={e.id}>
+                  <tr
+                    key={e.id}
+                    onClick={() => setExpDetail(e)}
+                    style={{ cursor: "pointer" }}
+                    title="Click for the split breakdown"
+                  >
                     <td className="muted small tabular">{e.date}</td>
                     <td>{e.description}</td>
                     <td>
@@ -302,6 +308,54 @@ export default function GroupDetail() {
                 </button>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {expDetail && (
+        <div className="modal" onClick={() => setExpDetail(null)}>
+          <div className="card modal-body" onClick={(e) => e.stopPropagation()}>
+            <div className="row between" style={{ marginTop: 0 }}>
+              <h3 style={{ margin: 0 }}>{expDetail.description}</h3>
+              <button className="link" onClick={() => setExpDetail(null)}>
+                ✕
+              </button>
+            </div>
+            <div className="row wrap" style={{ gap: 8, margin: "6px 0 2px" }}>
+              <span className="chip">{expDetail.date}</span>
+              <span className="chip accent">{expDetail.split_type}</span>
+              {expDetail.currency !== "INR" && (
+                <span className="chip usd">
+                  {expDetail.amount_original} {expDetail.currency} @ {expDetail.fx_rate}
+                </span>
+              )}
+            </div>
+            <p style={{ margin: "6px 0" }}>
+              <span className="row" style={{ margin: 0, gap: 8 }}>
+                <Avatar name={expDetail.paid_by_name} sm />
+                <span>
+                  <strong>{expDetail.paid_by_name}</strong> paid{" "}
+                  <strong>{inr(expDetail.amount_inr)}</strong>
+                </span>
+              </span>
+            </p>
+            <div className="divider" />
+            <h4 className="muted" style={{ fontSize: "0.8rem", textTransform: "uppercase" }}>
+              Split between {expDetail.splits.length}
+            </h4>
+            {expDetail.splits.map((s) => (
+              <div className="ledger-line" key={s.id}>
+                <span className="row" style={{ margin: 0, gap: 8 }}>
+                  <Avatar name={s.member_name} sm />
+                  {s.member_name}
+                </span>
+                <span className="tabular">{inr(s.amount_inr)}</span>
+              </div>
+            ))}
+            <div className="row between" style={{ marginTop: 8, fontWeight: 700 }}>
+              <span className="muted small">Total</span>
+              <span className="tabular">{inr(expDetail.amount_inr)}</span>
+            </div>
           </div>
         </div>
       )}

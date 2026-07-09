@@ -95,6 +95,12 @@ class DetectorCoverageTests(SimpleTestCase):
     def test_airport_cab_impossible_year(self):
         self.assertIn(A.IMPOSSIBLE_DATE, self.by_row.get(26, set()))
 
+    def test_airport_cab_reconstructs_day_from_month_year_format(self):
+        # Row 26 is stored as 2014-03-01 with a mmm-yy format ("Mar-14"); the
+        # "14" is the intended day, so it must resolve to 2026-03-14.
+        row = next(r for r in self.rows if r["row_number"] == 26)
+        self.assertEqual(row["cleaned"]["date"].isoformat(), "2026-03-14")
+
     def test_deep_cleaning_ambiguous_date(self):
         self.assertIn(A.AMBIGUOUS_DATE, self.by_row.get(33, set()))
 
