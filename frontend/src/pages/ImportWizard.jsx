@@ -162,6 +162,22 @@ export default function ImportWizard() {
                           onChange={(e) => setRes(row.id, { paid_by: e.target.value })}
                         />
                       )}
+                      {row.anomalies.some((a) => a.code === "MISSING_AMOUNT") && (
+                        <input
+                          className="small"
+                          type="number"
+                          step="0.01"
+                          placeholder="amount"
+                          onChange={(e) => setRes(row.id, { amount: e.target.value })}
+                        />
+                      )}
+                      {row.anomalies.some((a) => a.code === "MISSING_DATE") && (
+                        <input
+                          className="small"
+                          type="date"
+                          onChange={(e) => setRes(row.id, { date: e.target.value })}
+                        />
+                      )}
                     </td>
                   </tr>
                 ))}

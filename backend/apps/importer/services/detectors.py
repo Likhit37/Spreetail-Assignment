@@ -91,6 +91,32 @@ def detect_missing_payer(ctx, roster):
         )
 
 
+def detect_missing_amount(ctx, roster):
+    if ctx["cleaned"].get("amount") is None:
+        ctx["anomalies"].append(
+            A.Anomaly(
+                A.MISSING_AMOUNT,
+                "blocker",
+                "No amount recorded for this row.",
+                "Enter the amount before committing.",
+                "hold row until an amount is supplied",
+            )
+        )
+
+
+def detect_missing_date(ctx, roster):
+    if ctx["cleaned"].get("date") is None:
+        ctx["anomalies"].append(
+            A.Anomaly(
+                A.MISSING_DATE,
+                "blocker",
+                "No usable date recorded for this row.",
+                "Enter a date before committing.",
+                "hold row until a date is supplied",
+            )
+        )
+
+
 def detect_unknown_payer(ctx, roster):
     raw_payer = ctx["raw"].get("paid_by")
     if not raw_payer:
@@ -474,6 +500,8 @@ def detect_duplicates(rows):
 PER_ROW_DETECTORS = [
     detect_missing_payer,
     detect_unknown_payer,
+    detect_missing_amount,
+    detect_missing_date,
     detect_missing_currency,
     detect_foreign_currency,
     detect_negative_amount,

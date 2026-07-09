@@ -293,3 +293,164 @@ class GenericSheetTests(TestCase):
         self.assertEqual(wifi["cleaned"]["date"].year, 2027)
         codes = {a.code for a in wifi["anomalies"]}
         self.assertIn(A.IMPOSSIBLE_DATE, codes)
+
+
+class RobustnessTests(TestCase):
+    """A missing field or a malformed row must never crash a commit, and must
+    never take an otherwise-successful commit down with it. 'A crashed import
+    and a silent guess are both failing answers' -- the assignment's own line.
+    """
+
+    def _rows(self, raw_rows):
+        return [{"row_number": i, "raw": r, "meta": {}} for i, r in enumerate(raw_rows, 1)]
+
+    def test_missing_amount_is_flagged_and_does_not_crash_commit(self):
+        raw_rows = self._rows(
+            [
+                {
+                    "date": "2026-06-01",
+                    "description": "Blank amount",
+                    "paid_by": "Aisha",
+                    "amount": None,
+                    "currency": "INR",
+                    "split_type": "equal",
+                    "split_with": "Aisha;Rohan",
+                    "split_details": None,
+                    "notes": None,
+                }
+            ]
+        )
+        roster = default_roster()
+        analyzed = analyze(raw_rows, roster)
+        self.assertIn(A.MISSING_AMOUNT, {a.code for a in analyzed[0]["anomalies"]})
+
+        group = Group.objects.create(name="Robustness 1")
+        batch = stage_batch(group, "x.xlsx", None, analyzed)
+        result = commit_batch(batch, roster)["committed"]
+        self.assertEqual(result["expenses"], 0)
+        self.assertEqual(result["skipped"], 1)
+
+    def test_missing_amount_commits_once_a_human_resolves_it(self):
+        # The review UI lets a human type in the real amount; that override
+        # must actually be used at commit, not silently ignored.
+        raw_rows = self._rows(
+            [
+                {
+                    "date": "2026-06-01",
+                    "description": "Blank amount, then fixed",
+                    "paid_by": "Aisha",
+                    "amount": None,
+                    "currency": "INR",
+                    "split_type": "equal",
+                    "split_with": "Aisha;Rohan",
+                    "split_details": None,
+                    "notes": None,
+                }
+            ]
+        )
+        roster = default_roster()
+        analyzed = analyze(raw_rows, roster)
+        group = Group.objects.create(name="Robustness 1b")
+        batch = stage_batch(group, "x.xlsx", None, analyzed)
+        row = batch.rows.get(row_number=1)
+        row.resolution = {"amount": "600"}
+        row.save(update_fields=["resolution"])
+
+        result = commit_batch(batch, roster)["committed"]
+        self.assertEqual(result["expenses"], 1)
+        expense = Expense.objects.get(group=group)
+        self.assertEqual(expense.amount_original, Decimal("600"))
+
+    def test_missing_date_is_flagged_and_does_not_crash_commit(self):
+        raw_rows = self._rows(
+            [
+                {
+                    "date": None,
+                    "description": "Blank date",
+                    "paid_by": "Aisha",
+                    "amount": 500,
+                    "currency": "INR",
+                    "split_type": "equal",
+                    "split_with": "Aisha;Rohan",
+                    "split_details": None,
+                    "notes": None,
+                }
+            ]
+        )
+        roster = default_roster()
+        analyzed = analyze(raw_rows, roster)
+        self.assertIn(A.MISSING_DATE, {a.code for a in analyzed[0]["anomalies"]})
+
+        group = Group.objects.create(name="Robustness 2")
+        batch = stage_batch(group, "x.xlsx", None, analyzed)
+        result = commit_batch(batch, roster)["committed"]
+        self.assertEqual(result["expenses"], 0)
+        self.assertEqual(result["skipped"], 1)
+
+    def test_one_broken_row_does_not_sink_the_rest_of_the_batch(self):
+        # An "unequal" split whose amounts don't sum to the total isn't
+        # caught by any detector ahead of time -- it only fails inside
+        # compute_shares() at commit. That must skip just this row, not
+        # roll back the two good rows around it.
+        raw_rows = self._rows(
+            [
+                {
+                    "date": "2026-06-01",
+                    "description": "Good expense before",
+                    "paid_by": "Aisha",
+                    "amount": 400,
+                    "currency": "INR",
+                    "split_type": "equal",
+                    "split_with": "Aisha;Rohan",
+                    "split_details": None,
+                    "notes": None,
+                },
+                {
+                    "date": "2026-06-02",
+                    "description": "Broken unequal split",
+                    "paid_by": "Aisha",
+                    "amount": 100,
+                    "currency": "INR",
+                    "split_type": "unequal",
+                    "split_with": "Aisha;Rohan",
+                    "split_details": "Aisha 60; Rohan 50",  # sums to 110, not 100
+                    "notes": None,
+                },
+                {
+                    "date": "2026-06-03",
+                    "description": "Good expense after",
+                    "paid_by": "Rohan",
+                    "amount": 200,
+                    "currency": "INR",
+                    "split_type": "equal",
+                    "split_with": "Aisha;Rohan",
+                    "split_details": None,
+                    "notes": None,
+                },
+            ]
+        )
+        roster = default_roster()
+        analyzed = analyze(raw_rows, roster)
+        group = Group.objects.create(name="Robustness 3")
+        batch = stage_batch(group, "x.xlsx", None, analyzed)
+
+        result = commit_batch(batch, roster)["committed"]
+        self.assertEqual(result["expenses"], 2)  # the two good rows
+        self.assertEqual(result["skipped"], 1)  # only the broken one
+
+        self.assertTrue(
+            Expense.objects.filter(description="Good expense before").exists()
+        )
+        self.assertTrue(
+            Expense.objects.filter(description="Good expense after").exists()
+        )
+        self.assertFalse(
+            Expense.objects.filter(description="Broken unequal split").exists()
+        )
+
+        report = build_report(batch)
+        error_findings = [
+            f for f in report["findings"] if f["code"] == A.ROW_COMMIT_ERROR
+        ]
+        self.assertEqual(len(error_findings), 1)
+        self.assertEqual(error_findings[0]["row"], 2)
