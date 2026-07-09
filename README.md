@@ -6,7 +6,7 @@ importer** that ingests a deliberately messy export, detects every data problem,
 surfaces it, and handles it by a documented policy — never a silent guess and
 never a crash.
 
-- **Live app:** _add Vercel URL after deploy_
+- **Live app:** _add GitHub Pages URL after deploy_
 - **API:** _add Render URL after deploy_
 
 ## Stack
@@ -72,19 +72,24 @@ python manage.py test          # 26 tests: split math, balances, detectors, comm
 Detector tests run against the **real, unedited** file, pinning each anomaly to
 the exact row that triggers it.
 
-## Deploy (all free tiers, no credit card)
+## Deploy
 - **Postgres → Neon:** create a free project at [neon.tech](https://neon.tech)
-  (no card) and copy its connection string.
-- **Backend → Koyeb:** deploy the repo's [`Dockerfile`](Dockerfile) as a Koyeb
-  web service (free Hobby tier, no card). The image installs deps, runs
-  collectstatic, migrates on boot, and serves via gunicorn. Set env vars:
-  `DEBUG=False`, `SECRET_KEY`, `DATABASE_URL` (Neon), `ALLOWED_HOSTS=.koyeb.app`,
-  `FX_PROVIDER_URL`. After the frontend is up, set `CORS_ALLOWED_ORIGINS` /
-  `CSRF_TRUSTED_ORIGINS` to the Vercel URL. Optional `ANTHROPIC_API_KEY` enables
-  the LLM feature. (`render.yaml` is also included for Render, which now requires
-  a card.)
-- **Frontend → Vercel:** import the repo, root directory `frontend`, framework
-  Vite. Set `VITE_API_BASE` to the Koyeb API URL.
+  (no card) and copy the pooled connection string.
+- **Backend → Render:** the repo includes [`render.yaml`](render.yaml). Create a
+  Blueprint from the repo; it runs `backend/build.sh` (install, collectstatic,
+  migrate) and starts gunicorn. Set env vars: `DEBUG=False`, `SECRET_KEY`,
+  `DATABASE_URL` (Neon), `ALLOWED_HOSTS=.onrender.com`, `FX_PROVIDER_URL`, and
+  after the frontend is up, `CORS_ALLOWED_ORIGINS` to the GitHub Pages origin
+  (`https://<user>.github.io`). Optional `ANTHROPIC_API_KEY` enables the LLM
+  feature. (A [`Dockerfile`](Dockerfile) is also included for container hosts.)
+- **Frontend → GitHub Pages:** pushing to `main` runs
+  [`.github/workflows/deploy-frontend.yml`](.github/workflows/deploy-frontend.yml),
+  which builds the Vite app and publishes it to Pages. Set a repo **variable**
+  `VITE_API_BASE` (Settings → Secrets and variables → Actions → Variables) to the
+  Render API URL, and enable Pages (Settings → Pages → Source: GitHub Actions).
+  The app is served at `https://<user>.github.io/Spreetail-Assignment/`; the Vite
+  `base` and router `basename` are configured for that subpath, and a
+  `404.html` fallback keeps deep links working.
 
 ## AI used
 Anthropic **Claude** (via Claude Code, model Opus 4.8) as the primary development
