@@ -213,6 +213,45 @@ class ApiFlowTests(TestCase):
         self.a = Member.objects.create(group=self.g, name="Aisha")
         self.b = Member.objects.create(group=self.g, name="Rohan")
 
+    def test_delete_group_with_expenses_succeeds(self):
+        # Members are PROTECT-referenced by expenses, so a naive group delete
+        # would 500 with a ProtectedError; perform_destroy tears children down
+        # in order first.
+        from apps.expenses.models import Expense, ExpenseSplit
+
+        self.client.post(
+            "/api/expenses/",
+            {
+                "group": self.g.id,
+                "date": "2026-05-01",
+                "description": "Groceries",
+                "paid_by": self.a.id,
+                "amount_original": "500",
+                "currency": "INR",
+                "split_type": "equal",
+                "participants": [self.a.id, self.b.id],
+            },
+            format="json",
+        )
+        self.client.post(
+            "/api/settlements/",
+            {
+                "group": self.g.id,
+                "date": "2026-05-02",
+                "from_member": self.b.id,
+                "to_member": self.a.id,
+                "amount_inr": "100",
+            },
+            format="json",
+        )
+        r = self.client.delete(f"/api/groups/{self.g.id}/")
+        self.assertEqual(r.status_code, 204)
+        self.assertFalse(Group.objects.filter(id=self.g.id).exists())
+        # Nothing orphaned behind it.
+        self.assertFalse(Expense.objects.filter(group_id=self.g.id).exists())
+        self.assertFalse(ExpenseSplit.objects.filter(expense__group_id=self.g.id).exists())
+        self.assertFalse(Member.objects.filter(group_id=self.g.id).exists())
+
     def test_add_expense_endpoint_creates_splits(self):
         r = self.client.post(
             "/api/expenses/",

@@ -33,6 +33,20 @@ class GroupViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
 
+    def perform_destroy(self, instance):
+        # Members are PROTECT-referenced by Expense.paid_by / ExpenseSplit.member
+        # / Settlement, which stops a member being deleted while they're still
+        # owed/owing. That protection is correct for deleting one member, but it
+        # would otherwise make deleting a whole group (which should tear down
+        # everything in it) fail with a ProtectedError. Clear the referencing
+        # rows first, then the cascade from Group -> Member is unobstructed.
+        from django.db import transaction
+
+        with transaction.atomic():
+            Expense.objects.filter(group=instance).delete()  # cascades splits
+            Settlement.objects.filter(group=instance).delete()
+            instance.delete()  # cascades members, memberships, aliases, imports
+
     @action(detail=True, methods=["get"])
     def balances(self, request, pk=None):
         group = self.get_object()
