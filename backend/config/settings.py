@@ -123,20 +123,6 @@ STORAGES = {
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Production hardening (only when DEBUG is off; the PaaS edge terminates HTTPS).
-if not DEBUG:
-    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-    # Off by default: the platform edge already enforces HTTPS, and an app-level
-    # redirect can 301 the platform's plain-HTTP health check into a failure.
-    # Enable explicitly (SECURE_SSL_REDIRECT=True) only if the host needs it.
-    SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", False)
-    # Render injects its external hostname; add it as a trusted CSRF origin.
-    if _render_host:
-        CSRF_TRUSTED_ORIGINS.append(f"https://{_render_host}")
-
-
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
@@ -157,6 +143,20 @@ CORS_ALLOWED_ORIGINS = [
 CSRF_TRUSTED_ORIGINS = [
     o.strip() for o in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",") if o.strip()
 ]
+
+# Production hardening (only when DEBUG is off; the PaaS edge terminates HTTPS).
+# Placed after CSRF_TRUSTED_ORIGINS is defined so the append below is valid.
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    # Off by default: the platform edge already enforces HTTPS, and an app-level
+    # redirect can 301 the platform's plain-HTTP health check into a failure.
+    # Enable explicitly (SECURE_SSL_REDIRECT=True) only if the host needs it.
+    SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", False)
+    # Render injects its external hostname; add it as a trusted CSRF origin.
+    if _render_host:
+        CSRF_TRUSTED_ORIGINS.append(f"https://{_render_host}")
 
 # --- App-specific config ---
 # Currency conversion (Priya's complaint). Frankfurter: free, no API key.
