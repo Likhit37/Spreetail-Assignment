@@ -8,7 +8,10 @@ services:
     plan: free # $0 tier; without this Render defaults to the paid Starter plan
     rootDir: backend
     buildCommand: "bash build.sh"
-    startCommand: "gunicorn config.wsgi:application"
+    # --timeout 120: the CSV commit does many round-trips to (possibly distant)
+    # Neon + live FX, which can exceed gunicorn's 30s default. 1 worker fits the
+    # free 512MB instance.
+    startCommand: "gunicorn config.wsgi:application --workers 1 --timeout 120"
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.8"

@@ -232,12 +232,14 @@ def commit_batch(batch: ImportBatch, roster: Roster) -> dict:
             participants,
             details_by_member or None,
         )
-        for member, share in shares.items():
-            ExpenseSplit.objects.create(
-                expense=expense,
-                member=member,
-                amount_inr=share,
-            )
+        # Bulk-insert splits (one query instead of one per member) to cut
+        # round-trips to a possibly-distant Postgres during import.
+        ExpenseSplit.objects.bulk_create(
+            [
+                ExpenseSplit(expense=expense, member=member, amount_inr=share)
+                for member, share in shares.items()
+            ]
+        )
         created["expenses"] += 1
         row.status = RowStatus.COMMITTED
         row.save(update_fields=["status"])
