@@ -33,10 +33,25 @@ class UploadView(APIView):
                 {"detail": "group and file are required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        from apps.expenses.views import accessible_groups
+
         group = get_object_or_404(Group, id=group_id)
+        if group not in accessible_groups(request.user):
+            return Response({"detail": "no access to this group"}, status=403)
         roster = default_roster()
-        raw_rows = parse_upload(upload, upload.name)
-        analyzed = analyze(raw_rows, roster)
+        try:
+            raw_rows = parse_upload(upload, upload.name)
+            analyzed = analyze(raw_rows, roster)
+        except Exception as exc:  # unreadable/garbage file -> clean 400, not 500
+            return Response(
+                {"detail": f"Could not read the file: {exc}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not raw_rows:
+            return Response(
+                {"detail": "The file has no data rows."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         batch = stage_batch(group, upload.name, request.user, analyzed)
         return Response(
             {
