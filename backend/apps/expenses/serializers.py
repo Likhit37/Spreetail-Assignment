@@ -10,10 +10,26 @@ from .models import (
 
 
 class MemberSerializer(serializers.ModelSerializer):
+    # The member's membership window (if any), so the UI can tell who was in
+    # the flat on a given date. Null dates mean open-ended / always active.
+    joined_at = serializers.SerializerMethodField()
+    left_at = serializers.SerializerMethodField()
+
     class Meta:
         model = Member
-        fields = ("id", "group", "name", "is_guest")
+        fields = ("id", "group", "name", "is_guest", "joined_at", "left_at")
         read_only_fields = ("group",)
+
+    def _window(self, obj):
+        return obj.membership_windows.order_by("joined_at").first()
+
+    def get_joined_at(self, obj):
+        w = self._window(obj)
+        return w.joined_at.isoformat() if w and w.joined_at else None
+
+    def get_left_at(self, obj):
+        w = self._window(obj)
+        return w.left_at.isoformat() if w and w.left_at else None
 
 
 class GroupSerializer(serializers.ModelSerializer):

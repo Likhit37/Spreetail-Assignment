@@ -1,7 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
 import { Avatar, inr } from "../ui";
+import AddExpenseModal from "../components/AddExpenseModal";
+import SettleModal from "../components/SettleModal";
+import MembersModal from "../components/MembersModal";
 
 export default function GroupDetail() {
   const { id } = useParams();
@@ -11,14 +14,26 @@ export default function GroupDetail() {
   const [settlements, setSettlements] = useState([]);
   const [tab, setTab] = useState("balances");
   const [drill, setDrill] = useState(null);
+  const [modal, setModal] = useState(null); // 'expense' | 'settle' | 'members'
+  const [settleSuggestion, setSettleSuggestion] = useState(null);
   const [error, setError] = useState("");
 
-  useEffect(() => {
+  const reload = useCallback(() => {
     api.group(id).then(setGroup).catch((e) => setError(e.message));
     api.balances(id).then(setBalances).catch((e) => setError(e.message));
     api.expenses(id).then(setExpenses).catch(() => {});
     api.settlements(id).then(setSettlements).catch(() => {});
   }, [id]);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  function afterSave() {
+    setModal(null);
+    setSettleSuggestion(null);
+    reload();
+  }
 
   const stats = useMemo(() => {
     const total = expenses.reduce((s, e) => s + Number(e.amount_inr), 0);
@@ -56,9 +71,20 @@ export default function GroupDetail() {
           <Avatar name={group.name} />
           <h1 style={{ margin: 0 }}>{group.name}</h1>
         </div>
-        <Link className="button" to={`/groups/${id}/import`}>
-          📥 Import spreadsheet
-        </Link>
+        <div className="row wrap" style={{ margin: 0, gap: 8 }}>
+          <button className="ghost" onClick={() => setModal("members")}>
+            👥 Members
+          </button>
+          <button className="ghost" onClick={() => setModal("settle")}>
+            💸 Settle up
+          </button>
+          <button onClick={() => setModal("expense")} disabled={!group.members?.length}>
+            ＋ Add expense
+          </button>
+          <Link className="button ghost" to={`/groups/${id}/import`}>
+            📥 Import
+          </Link>
+        </div>
       </div>
 
       <div className="stat-grid">
@@ -141,6 +167,16 @@ export default function GroupDetail() {
                   <Avatar name={t.to_name} sm />
                   <span>{t.to_name}</span>
                   <span className="amt">{inr(t.amount)}</span>
+                  <button
+                    className="link small"
+                    title="Record this payment"
+                    onClick={() => {
+                      setSettleSuggestion(t);
+                      setModal("settle");
+                    }}
+                  >
+                    settle
+                  </button>
                 </div>
               ))
             )}
@@ -268,6 +304,24 @@ export default function GroupDetail() {
             )}
           </div>
         </div>
+      )}
+
+      {modal === "expense" && (
+        <AddExpenseModal group={group} onClose={() => setModal(null)} onSaved={afterSave} />
+      )}
+      {modal === "settle" && (
+        <SettleModal
+          group={group}
+          suggestion={settleSuggestion}
+          onClose={() => {
+            setModal(null);
+            setSettleSuggestion(null);
+          }}
+          onSaved={afterSave}
+        />
+      )}
+      {modal === "members" && (
+        <MembersModal group={group} onClose={() => setModal(null)} onSaved={afterSave} />
       )}
     </div>
   );

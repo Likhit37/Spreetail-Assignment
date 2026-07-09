@@ -50,7 +50,21 @@ export const api = {
   explain: (id, mid) => request(`/api/groups/${id}/members/${mid}/explain/`),
 
   expenses: (groupId) => request(`/api/expenses/?group=${groupId}`),
+  addExpense: (payload) =>
+    request("/api/expenses/", { method: "POST", body: payload }),
   settlements: (groupId) => request(`/api/settlements/?group=${groupId}`),
+  addSettlement: (payload) =>
+    request("/api/settlements/", { method: "POST", body: payload }),
+  addMember: (groupId, name, joined_at) =>
+    request(`/api/groups/${groupId}/add_member/`, {
+      method: "POST",
+      body: { name, joined_at },
+    }),
+  memberLeave: (groupId, memberId, left_at) =>
+    request(`/api/groups/${groupId}/members/${memberId}/leave/`, {
+      method: "POST",
+      body: { left_at },
+    }),
 
   upload: (groupId, file) => {
     const fd = new FormData();
