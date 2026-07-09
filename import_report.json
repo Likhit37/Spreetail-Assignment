@@ -147,8 +147,8 @@
       "description": "Airport cab",
       "code": "IMPOSSIBLE_DATE",
       "severity": "warning",
-      "message": "Year 2014 is outside the group's active period.",
-      "action": "correct year to 2026"
+      "message": "Date 2014-03-01 is outside the group's active period.",
+      "action": "read day from month-year format; year -> 2026"
     },
     {
       "row": 26,

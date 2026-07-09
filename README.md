@@ -74,10 +74,15 @@ python manage.py generate_import_report \
 ## Tests
 ```bash
 cd backend
-python manage.py test          # 26 tests: split math, balances, detectors, commit
+python manage.py test          # 48 tests: split math, balances, auth, detectors,
+                                # commit, generic-sheet + robustness cases
 ```
 Detector tests run against the **real, unedited** file, pinning each anomaly to
-the exact row that triggers it.
+the exact row that triggers it. A separate set (`GenericSheetTests`,
+`RobustnessTests`) proves the importer against synthetic data the roster was
+never seeded for — an unrecognised payer, a different sheet's year, a missing
+amount/date, and a malformed row that must not take the rest of the batch
+down with it.
 
 ## Deploy
 - **Postgres → Neon:** create a free project at [neon.tech](https://neon.tech)

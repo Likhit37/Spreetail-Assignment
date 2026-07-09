@@ -29,11 +29,14 @@ right." Representative prompts, roughly in order:
   belong to?"*
 - *"Sweep the repo for dead files and stale docs left over from the deploy
   pivots. Cross-check every frontend API call against the real backend URLs."*
+- *"If this sheet had different or missing columns, would the importer still
+  handle it, or just crash? Trace it, don't guess."*
 
-The habit that caught the most — both by me and, in one important case, by the
-person I was building this for — was **running the app against the real file
-and checking an invariant** (an anomaly count, a balance sum, a specific row's
-resolved date) rather than eyeballing the code and declaring it correct.
+The habit that caught the most — by me, and in two important cases by the
+person I was building this for — was **running the app against real input
+and checking an invariant** (an anomaly count, a balance sum, a specific
+row's resolved date, "does the transaction actually roll back cleanly")
+rather than eyeballing the code and declaring it correct.
 
 ## Concrete cases where the AI was wrong
 
@@ -139,6 +142,40 @@ resolved date) rather than eyeballing the code and declaring it correct.
   to every relevant queryset and write path (including the importer's upload).
   Added a test asserting a second user gets `403` on someone else's group.
 
+### 8. A missing column didn't just crash one row — it could have silently discarded a whole successful commit
+- **What it produced:** `commit_batch` read `Decimal(str(cleaned.get("amount")))`
+  with no guard. A row with no usable amount produced `Decimal("None")`, which
+  raises `decimal.InvalidOperation` — uncaught, so the request 500'd. No
+  detector flagged a blank amount ahead of time either; it sailed through
+  `analyze()` in silence and only broke at commit.
+- **How I caught it:** not a bug report or a failing test — the user asked
+  "what happens if this sheet has different columns than the one we built
+  against?" while reviewing the code for genericity. Tracing the answer
+  surfaced the crash.
+- **What made it worse on investigation:** `commit_batch` is wrapped in a
+  single `@transaction.atomic`, and had no per-row failure isolation at all.
+  That meant the blank-amount crash wasn't just "one bad row fails" — it would
+  have rolled back *every other row already committed in that same batch*,
+  silently discarding otherwise-successful work with no record of why. A
+  malformed `unequal` split (per-person amounts not summing to the total) had
+  the identical failure mode and was just as reachable.
+- **What I changed:** added `MISSING_AMOUNT`/`MISSING_DATE` detectors so the
+  common cases are caught and shown in the review UI *before* commit is
+  attempted, with fix-it inputs matching the existing `MISSING_PAYER` pattern.
+  But detectors can't anticipate every malformed input, so I also gave each
+  row its own `transaction.atomic()` savepoint inside the commit loop: an
+  unexpected failure now rolls back only that one row, gets recorded on it,
+  and surfaces in the import report as `ROW_COMMIT_ERROR` — while every other
+  row in the batch commits normally. `RobustnessTests` proves this with a
+  deliberately broken row sandwiched between two good ones; both good rows
+  commit and only the broken one is skipped.
+- **Why this one is notable:** it's the second case in this project (after
+  case 6) where the user's question, not a test I wrote, found the bug — and
+  the honest first fix I proposed (just guard the one `Decimal()` call) was
+  narrower than the actual problem. Tracing *why* the crash could happen led
+  to the transaction-scope issue underneath it, which was the more important
+  fix.
+
 ## Smaller catches
 - The rule-based balance explanation first rendered "Rohan owes the group
   **₹-500.00**" — a negative sign after "owes." Caught in the explain smoke
@@ -159,7 +196,10 @@ resolved date) rather than eyeballing the code and declaring it correct.
 The AI was fast at producing plausible code, and wrong in ways that mostly
 surfaced by **running it against the real data and checking an invariant**
 (anomaly counts, balances summing to zero, a diff of the report against the
-raw sheet) rather than reading the code and declaring it correct. Case 6 is
-the important exception: it passed every invariant I thought to check, and
-only a human comparing the output to the source caught it — a reminder that
-self-testing is bounded by what the tester thought to test for.
+raw sheet) rather than reading the code and declaring it correct. Cases 6 and
+8 are the important exceptions: both passed every invariant I'd already
+thought to check, and both were only caught because the user asked a
+different question than I had — "is this date actually right?" and "what if
+the input isn't shaped like the one file we tested?" Self-testing is bounded
+by what the tester thought to test for; the fixes that mattered most in this
+project came from someone asking a question I hadn't.

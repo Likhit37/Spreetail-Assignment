@@ -137,3 +137,29 @@ Each entry: the decision, the options considered, and why the chosen one won.
   instead of assuming a literal year. `GenericSheetTests` proves all three
   against a synthetic sheet the roster was never seeded for — including a
   2027 dataset that self-corrects to 2027, not a hardcoded 2026.
+
+### 18. Commit isolates each row in its own savepoint, never trusts detectors alone
+- **Options:** trust the detectors to catch everything ahead of time and let
+  `commit_batch` assume clean input · defend at commit time too, with each row
+  isolated so one failure can't affect any other.
+- **Chosen:** defend at commit time as well. A blank amount was reachable
+  without tripping any detector (no `MISSING_AMOUNT` existed) and crashed
+  `commit_batch` with an unhandled `decimal.InvalidOperation` — found by
+  asking "what if a column goes missing on a different sheet?", not by a
+  failing test, since none existed for that case. Fixing the immediate crash
+  wasn't enough: the whole function had no per-row failure isolation at all,
+  and `commit_batch` is `@transaction.atomic`, so *any* unexpected failure on
+  *any* row — a malformed `unequal` split whose amounts don't sum to the
+  total, for instance — would have rolled back every other row already
+  committed in the same batch, silently discarding otherwise-successful work.
+  Added `MISSING_AMOUNT`/`MISSING_DATE` detectors so the common cases are
+  caught proactively and shown in the review UI (with fix-it inputs, same
+  pattern as `MISSING_PAYER`) — but detectors can never cover every possible
+  malformed input, so each row's commit now also runs inside its own
+  `transaction.atomic()` savepoint inside the outer one. An unexpected
+  exception rolls back only that row, gets recorded on it as
+  `resolution.commit_error`, surfaces in the import report as
+  `ROW_COMMIT_ERROR`, and every other row in the batch is unaffected.
+  `RobustnessTests` proves this with a deliberately broken row sandwiched
+  between two good ones. Belt (proactive detection) and suspenders (recovery
+  that can't crash) rather than either alone.
