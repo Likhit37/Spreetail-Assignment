@@ -65,6 +65,30 @@ The rule-based balance explanation first rendered "Rohan owes the group
 **₹-500.00**" — a negative sign after the word "owes". Caught in the explain
 smoke test; changed the template to use the **absolute** magnitude.
 
+## Two more caught during deployment (real environment, not local)
+
+### 4. Settings crashed only in production — `NameError`
+- **What it produced:** the `if not DEBUG:` hardening block did
+  `CSRF_TRUSTED_ORIGINS.append(...)`, but that list was defined *later* in the
+  file. The block also guarded the append behind `if _render_host:`.
+- **How I caught it:** it passed `manage.py check` locally (no
+  `RENDER_EXTERNAL_HOSTNAME`, so the append never ran) but the **Render build log**
+  showed `NameError: name 'CSRF_TRUSTED_ORIGINS' is not defined`.
+- **What I changed:** moved the block to after the CORS/CSRF definitions, and
+  re-verified locally by exporting `DEBUG=False` **and** `RENDER_EXTERNAL_HOSTNAME`
+  to reproduce the exact production condition.
+
+### 5. CSV import returned a 502 in production
+- **What it produced:** the commit endpoint worked locally but returned **502
+  after ~31s** on Render. gunicorn's **default 30s worker timeout** killed the
+  request: the commit makes many sequential round-trips to a (distant) Neon
+  Postgres plus live FX calls.
+- **How I caught it:** driving the deployed `/commit` endpoint with the real file
+  and seeing `HTTP 502 in 31.7s`.
+- **What I changed:** raised the gunicorn timeout to 120s **and** `bulk_create`d
+  the expense splits (one query per expense instead of one per member), cutting
+  ~110 queries. Commit then returned 200 and balances summed to ₹0.00 in prod.
+
 ## What this demonstrates
 The AI was fast at producing plausible code, and wrong in ways that only surfaced
 by **running it against the real data and checking invariants** (anomaly counts,

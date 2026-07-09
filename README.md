@@ -6,8 +6,8 @@ importer** that ingests a deliberately messy export, detects every data problem,
 surfaces it, and handles it by a documented policy — never a silent guess and
 never a crash.
 
-- **Live app:** _add GitHub Pages URL after deploy_
-- **API:** _add Render URL after deploy_
+- **Live app:** https://likhit37.github.io/Spreetail-Assignment/
+- **API:** https://shared-expenses-api-8wuo.onrender.com
 
 ## Stack
 - **Backend:** Django 5 + Django REST Framework, JWT auth (`djangorestframework-simplejwt`)
