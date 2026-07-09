@@ -18,14 +18,21 @@ never a crash.
   back to a deterministic template when no key is set)
 
 ## What it does
-- Login / register
-- Groups whose membership changes over time (join/leave dates)
-- Expenses with four split types — `equal`, `unequal`, `percentage`, `share` (ratio)
-- Settlements (payments) recorded separately from expenses
+- Login / register (JWT; each user only sees groups they created or belong to)
+- **Manage groups** whose membership changes over time — add a member with a join
+  date, or mark when someone left
+- **Add expenses** manually in any of four split types — `equal`, `unequal`,
+  `percentage`, `share` (ratio); the form only lets you split among members who
+  were in the group on the expense's date
+- **Settle up** — record a payment between two members (kept separate from
+  expenses); each "who pays whom" row has a one-click settle shortcut
 - Group balances: net per person **and** a minimal "who pays whom" list
 - Per-member drill-down: every expense line behind a balance (no magic numbers)
 - **Import wizard:** upload the export → review every anomaly → resolve blockers
   → commit → import report
+
+Manual and imported expenses share the exact same split + FX code, so both
+always produce balances that sum to zero.
 
 See [SCOPE.md](SCOPE.md) for the anomaly log + schema, [DECISIONS.md](DECISIONS.md)
 for why things are the way they are, and [AI_USAGE.md](AI_USAGE.md) for how AI was

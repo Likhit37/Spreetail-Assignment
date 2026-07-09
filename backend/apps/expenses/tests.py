@@ -262,6 +262,29 @@ class ApiFlowTests(TestCase):
         self.assertEqual(net[self.b.id], Decimal("100.00"))
         self.assertEqual(net[self.a.id], Decimal("-100.00"))
 
+    def test_cannot_add_expense_to_other_users_group(self):
+        from django.contrib.auth import get_user_model
+        from rest_framework.test import APIClient
+
+        other = get_user_model().objects.create_user("v", "v@x.com", "pw123456")
+        c2 = APIClient()
+        c2.force_authenticate(other)
+        r = c2.post(
+            "/api/expenses/",
+            {
+                "group": self.g.id,
+                "date": "2026-05-01",
+                "description": "Sneaky",
+                "paid_by": self.a.id,
+                "amount_original": "100",
+                "currency": "INR",
+                "split_type": "equal",
+                "participants": [self.a.id, self.b.id],
+            },
+            format="json",
+        )
+        self.assertEqual(r.status_code, 403)
+
     def test_add_member_and_leave(self):
         r = self.client.post(
             f"/api/groups/{self.g.id}/add_member/",

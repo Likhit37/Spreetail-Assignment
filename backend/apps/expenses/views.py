@@ -16,16 +16,19 @@ from .services.expense_ops import ExpenseInputError, create_expense
 from .services.explain import explain_balance
 
 
+def accessible_groups(user):
+    """Groups the user created or is a member of. Used to scope reads/writes."""
+    return (
+        Group.objects.filter(created_by=user)
+        | Group.objects.filter(members__user=user)
+    ).distinct()
+
+
 class GroupViewSet(viewsets.ModelViewSet):
     serializer_class = GroupSerializer
 
     def get_queryset(self):
-        # Groups the user created or is a member of.
-        user = self.request.user
-        return (
-            Group.objects.filter(created_by=user)
-            | Group.objects.filter(members__user=user)
-        ).distinct()
+        return accessible_groups(self.request.user)
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
@@ -109,7 +112,7 @@ class MemberViewSet(viewsets.ModelViewSet):
     serializer_class = MemberSerializer
 
     def get_queryset(self):
-        qs = Member.objects.all()
+        qs = Member.objects.filter(group__in=accessible_groups(self.request.user))
         group_id = self.request.query_params.get("group")
         if group_id:
             qs = qs.filter(group_id=group_id)
@@ -120,7 +123,12 @@ class ExpenseViewSet(viewsets.ModelViewSet):
     serializer_class = ExpenseSerializer
 
     def get_queryset(self):
-        qs = Expense.objects.select_related("paid_by").prefetch_related("splits")
+        # Only expenses in groups the user can access.
+        qs = (
+            Expense.objects.filter(group__in=accessible_groups(self.request.user))
+            .select_related("paid_by")
+            .prefetch_related("splits")
+        )
         group_id = self.request.query_params.get("group")
         if group_id:
             qs = qs.filter(group_id=group_id)
@@ -131,6 +139,8 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         form = ExpenseCreateSerializer(data=request.data)
         form.is_valid(raise_exception=True)
         v = form.validated_data
+        if v["group"] not in accessible_groups(request.user):
+            return Response({"detail": "no access to this group"}, status=403)
         try:
             expense = create_expense(
                 group=v["group"],
@@ -154,8 +164,19 @@ class SettlementViewSet(viewsets.ModelViewSet):
     serializer_class = SettlementSerializer
 
     def get_queryset(self):
-        qs = Settlement.objects.all()
+        qs = Settlement.objects.filter(
+            group__in=accessible_groups(self.request.user)
+        )
         group_id = self.request.query_params.get("group")
         if group_id:
             qs = qs.filter(group_id=group_id)
         return qs
+
+    def perform_create(self, serializer):
+        if serializer.validated_data["group"] not in accessible_groups(
+            self.request.user
+        ):
+            from rest_framework.exceptions import PermissionDenied
+
+            raise PermissionDenied("no access to this group")
+        serializer.save()
