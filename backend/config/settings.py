@@ -162,6 +162,9 @@ if not DEBUG:
     # redirect can 301 the platform's plain-HTTP health check into a failure.
     # Enable explicitly (SECURE_SSL_REDIRECT=True) only if the host needs it.
     SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", False)
+    # Both Render and GitHub Pages are permanently HTTPS-only, so a modest HSTS
+    # duration is safe (no plan to ever serve this over plain HTTP).
+    SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "3600"))
     # Render injects its external hostname; add it as a trusted CSRF origin.
     if _render_host:
         CSRF_TRUSTED_ORIGINS.append(f"https://{_render_host}")

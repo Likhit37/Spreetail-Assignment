@@ -26,7 +26,6 @@ from apps.expenses.models import (
 from apps.expenses.services.splitting import compute_shares, round_money
 
 from ..models import ImportBatch, ImportRow, ImportStatus, RowKind, RowStatus
-from . import anomalies as A
 from . import fx
 from .roster import Roster, normalize
 

@@ -10,7 +10,7 @@ from pathlib import Path
 
 from django.test import SimpleTestCase, TestCase
 
-from apps.expenses.models import Expense, ExpenseSplit, Group, Member
+from apps.expenses.models import Expense, Group
 from apps.expenses.services.balances import net_balances
 
 from .models import FxRate

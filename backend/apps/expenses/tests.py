@@ -13,7 +13,7 @@ from .models import (
 )
 from .services.balances import member_ledger, net_balances, simplify
 from .services.expense_ops import ExpenseInputError, create_expense
-from .services.splitting import compute_shares, round_money
+from .services.splitting import compute_shares
 
 
 class SplittingTests(TestCase):

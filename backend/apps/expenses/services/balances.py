@@ -19,7 +19,7 @@ payer's net and lowers the receiver's.
 
 from decimal import Decimal
 
-from ..models import Expense, ExpenseSplit, Member, Settlement
+from ..models import ExpenseSplit, Member, Settlement
 from .splitting import round_money
 
 
