@@ -5,10 +5,32 @@ The importer needs a canonical roster to do three things the raw sheet can't:
   * know that Meera left end-March and Sam joined mid-April (date windows),
   * spot a participant who isn't a flatmate at all (Dev's friend Kabir).
 
-These defaults come straight from the assignment narrative and are documented
-in DECISIONS.md. They are *defaults*: the review UI lets a human correct any of
-them before commit, so we are not hard-coding a silent guess — we are seeding a
-best guess and surfacing it.
+`default_roster()` below is the ONE deliberately hardcoded piece of domain
+knowledge in this codebase, and it is hardcoded on purpose, not out of
+laziness: the assignment PDF *narrates* who these six people are and states
+outright that "Meera moved out at the end of March, and Sam moved in
+mid-April." No algorithm can derive that from the spreadsheet alone — those
+facts live in a sentence of English the sheet never contains. Swapping in a
+different flat means writing a different `default_roster()` (or building a
+small admin UI for it); nothing else in the importer changes.
+
+Everything downstream of the roster IS generic, and is exercised in
+GenericSheetTests against a synthetic sheet the roster was never seeded for:
+  * name matching for casing/whitespace ("priya", "ROHAN ") happens for free
+    for any name in the roster via `normalize()` below — no per-name entry
+    needed. Only genuinely different spellings ("Priya S") need an explicit
+    alias.
+  * a payer or settlement counterparty the roster doesn't recognise is not
+    silently dropped: they're created as a real (guest) member, exactly like
+    an unrecognised participant already was. See `_resolve_or_create_member`
+    in pipeline.py.
+  * the "impossible date" detector infers which year the sheet is actually
+    using from the sheet's own data (the mode of its parsed dates), instead
+    of assuming any particular year. See `_infer_expected_year`.
+
+These defaults are still just *defaults*: the review UI lets a human correct
+any of them before commit, so seeding a best guess and surfacing it is not
+the same as hard-coding a silent guess.
 """
 
 from dataclasses import dataclass, field
@@ -56,17 +78,16 @@ class Roster:
 
 
 def default_roster() -> Roster:
-    """The flat's roster as told by the assignment."""
+    """The flat's roster as told by the assignment's narrative (see module
+    docstring for why this is the one deliberately hardcoded piece of
+    domain knowledge here, and why nothing else needs to be).
+    """
     canon = ["Aisha", "Rohan", "Priya", "Meera", "Dev", "Sam"]
+    # Case/whitespace variants of these six names (e.g. "priya", "rohan ")
+    # already match via normalize() in `canonical()` above — no per-name
+    # entry needed for those. Only a genuinely different spelling needs one.
     aliases = {normalize(c): c for c in canon}
-    # Extra spellings that appear in the sheet.
-    aliases.update(
-        {
-            normalize("priya s"): "Priya",
-            normalize("priya"): "Priya",
-            normalize("rohan"): "Rohan",  # trailing-space variant normalises here
-        }
-    )
+    aliases[normalize("priya s")] = "Priya"
     windows = {
         # Meera moved out at the end of March.
         "Meera": (date(2026, 2, 1), date(2026, 3, 31)),

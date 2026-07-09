@@ -11,6 +11,7 @@ review UI shows and the commit step later turns into real rows.
 
 import datetime as dt
 import re
+from collections import Counter
 from decimal import Decimal, InvalidOperation
 
 from . import anomalies as A
@@ -182,7 +183,8 @@ def detect_subunit_precision(ctx, roster):
 
 def detect_impossible_date(ctx, roster):
     d = ctx["cleaned"].get("date")
-    if not d or d.year == 2026:
+    expected_year = ctx["expected_year"]
+    if not d or d.year == expected_year:
         return
 
     fmt = (ctx.get("meta", {}).get("date_format") or "").lower()
@@ -193,16 +195,16 @@ def detect_impossible_date(ctx, roster):
     day_guess = d.year % 100
     if month_year_format and 1 <= day_guess <= 28:
         try:
-            suggested = dt.date(2026, d.month, day_guess)
+            suggested = dt.date(expected_year, d.month, day_guess)
             reason = (
                 f"Cell is month-year formatted ('{ctx['meta']['date_format']}'), "
                 f"so '{day_guess}' is the day, not the year."
             )
-            action = "read day from month-year format; year -> 2026"
+            action = f"read day from month-year format; year -> {expected_year}"
         except ValueError:
-            suggested, reason, action = _year_fix(d)
+            suggested, reason, action = _year_fix(d, expected_year)
     else:
-        suggested, reason, action = _year_fix(d)
+        suggested, reason, action = _year_fix(d, expected_year)
 
     ctx["cleaned"]["date"] = suggested
     ctx["anomalies"].append(
@@ -216,11 +218,11 @@ def detect_impossible_date(ctx, roster):
     )
 
 
-def _year_fix(d):
+def _year_fix(d, expected_year):
     return (
-        d.replace(year=2026),
+        d.replace(year=expected_year),
         f"Year {d.year} looks like a typo.",
-        "correct year to 2026",
+        f"correct year to {expected_year}",
     )
 
 
@@ -358,18 +360,22 @@ def classify_settlement(ctx, roster):
 # cross-row detectors
 # --------------------------------------------------------------------------- #
 def detect_ambiguous_dates(rows):
-    """Flag a 2026 date that jumps ahead of the row that follows it.
+    """Flag a date that jumps ahead of the row that follows it.
 
     The sheet is kept in chronological order, so a row whose date is later than
     the next row's date is out of sequence — the classic day/month-swap mess
     (e.g. 05-04 meant as 04-05). We only compare to the immediate next valid
-    date to avoid false positives from same-day clusters or corrected years.
+    date (in the sheet's own inferred year) to avoid false positives from
+    same-day clusters or corrected years.
     """
+    if not rows:
+        return
+    expected_year = rows[0]["expected_year"]
     for ctx in rows:
         d = ctx["cleaned"].get("date")
-        if not d or d.year != 2026:
+        if not d or d.year != expected_year:
             continue
-        nxt = _next_valid_date(rows, ctx)
+        nxt = _next_valid_date(rows, ctx, expected_year)
         if nxt and d > nxt:
             swapped = _swap_day_month(d)
             suggestion = (
@@ -389,14 +395,14 @@ def detect_ambiguous_dates(rows):
             )
 
 
-def _next_valid_date(rows, ctx):
+def _next_valid_date(rows, ctx, expected_year):
     idx = rows.index(ctx)
     for later in rows[idx + 1 :]:
         # A row whose year we just corrected is not a trustworthy anchor.
         if any(a.code == A.IMPOSSIBLE_DATE for a in later["anomalies"]):
             continue
         d = later["cleaned"].get("date")
-        if d and d.year == 2026:
+        if d and d.year == expected_year:
             return d
     return None
 
@@ -481,8 +487,27 @@ PER_ROW_DETECTORS = [
 ]
 
 
+def _infer_expected_year(raw_rows) -> int:
+    """The year most rows in the sheet actually use.
+
+    `detect_impossible_date` needs a "this is the real year" reference to spot
+    outliers against. Hardcoding a literal year would silently mis-correct
+    every date on a sheet from a different year; the sheet's own dominant year
+    is a self-describing reference instead. A handful of garbled dates (the
+    very rows we're trying to detect) are a small minority and won't shift the
+    mode. Falls back to the current year if no row has a parseable date.
+    """
+    years = [
+        d.year for rr in raw_rows if (d := parse_date(rr["raw"].get("date")))
+    ]
+    if not years:
+        return dt.date.today().year
+    return Counter(years).most_common(1)[0][0]
+
+
 def analyze(raw_rows, roster: Roster | None = None):
     roster = roster or Roster()
+    expected_year = _infer_expected_year(raw_rows)
     rows = []
     for rr in raw_rows:
         raw = rr["raw"]
@@ -490,6 +515,7 @@ def analyze(raw_rows, roster: Roster | None = None):
             "row_number": rr["row_number"],
             "raw": raw,
             "meta": rr.get("meta", {}),
+            "expected_year": expected_year,
             "kind": "expense",
             "status": "clean",
             "anomalies": [],

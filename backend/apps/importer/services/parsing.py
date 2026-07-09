@@ -10,18 +10,6 @@ import csv
 import datetime as dt
 import io
 
-EXPECTED_COLUMNS = [
-    "date",
-    "description",
-    "paid_by",
-    "amount",
-    "currency",
-    "split_type",
-    "split_with",
-    "split_details",
-    "notes",
-]
-
 
 def _cell(value):
     """Make a cell JSON-safe while preserving its meaning."""

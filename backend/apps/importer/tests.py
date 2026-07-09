@@ -178,3 +178,118 @@ class ImportCommitTests(TestCase):
         self.assertEqual(villa.currency, "USD")
         self.assertEqual(villa.fx_rate, Decimal("85"))
         self.assertEqual(villa.amount_inr, Decimal("45900.00"))
+
+
+class GenericSheetTests(TestCase):
+    """Prove the importer isn't only wired for this exact flat's people.
+
+    Builds a synthetic sheet with a payer and a settlement recipient the
+    roster has never heard of, to check they're handled the same way an
+    unrecognised participant already is (created as a member) instead of
+    silently vanishing.
+    """
+
+    def _rows(self, raw_rows):
+        return [{"row_number": i, "raw": r, "meta": {}} for i, r in enumerate(raw_rows, 1)]
+
+    def test_unknown_payer_becomes_a_member_not_a_skip(self):
+        raw_rows = self._rows(
+            [
+                {
+                    "date": "2026-06-01",
+                    "description": "Random shop run",
+                    "paid_by": "Zoya",  # not in default_roster() at all
+                    "amount": 500,
+                    "currency": "INR",
+                    "split_type": "equal",
+                    "split_with": "Aisha;Rohan;Zoya",
+                    "split_details": None,
+                    "notes": None,
+                }
+            ]
+        )
+        group = Group.objects.create(name="Different Flat")
+        roster = default_roster()
+        analyzed = analyze(raw_rows, roster)
+        batch = stage_batch(group, "other.xlsx", None, analyzed)
+        result = commit_batch(batch, roster)["committed"]
+
+        self.assertEqual(result["expenses"], 1)
+        self.assertEqual(result["skipped"], 0)
+        expense = Expense.objects.get(group=group)
+        self.assertEqual(expense.paid_by.name, "Zoya")
+        self.assertTrue(expense.paid_by.is_guest)
+
+    def test_missing_payer_still_blocks_correctly(self):
+        # An actually-blank payer must still be held, not guessed at.
+        raw_rows = self._rows(
+            [
+                {
+                    "date": "2026-06-01",
+                    "description": "Mystery charge",
+                    "paid_by": None,
+                    "amount": 100,
+                    "currency": "INR",
+                    "split_type": "equal",
+                    "split_with": "Aisha;Rohan",
+                    "split_details": None,
+                    "notes": None,
+                }
+            ]
+        )
+        group = Group.objects.create(name="Different Flat 2")
+        roster = default_roster()
+        analyzed = analyze(raw_rows, roster)
+        batch = stage_batch(group, "other.xlsx", None, analyzed)
+        result = commit_batch(batch, roster)["committed"]
+
+        self.assertEqual(result["expenses"], 0)
+        self.assertEqual(result["skipped"], 1)
+
+    def test_impossible_date_corrects_to_the_sheets_own_year_not_2026(self):
+        # A 2027 sheet with one garbled-year row must self-correct to 2027,
+        # proving the "expected year" is inferred from the data, not a
+        # hardcoded 2026 baked in for this one assignment's dataset.
+        raw_rows = self._rows(
+            [
+                {
+                    "date": "2027-01-05",
+                    "description": "January rent",
+                    "paid_by": "Aisha",
+                    "amount": 1000,
+                    "currency": "INR",
+                    "split_type": "equal",
+                    "split_with": "Aisha;Rohan",
+                    "split_details": None,
+                    "notes": None,
+                },
+                {
+                    "date": "2027-01-10",
+                    "description": "Groceries",
+                    "paid_by": "Rohan",
+                    "amount": 500,
+                    "currency": "INR",
+                    "split_type": "equal",
+                    "split_with": "Aisha;Rohan",
+                    "split_details": None,
+                    "notes": None,
+                },
+                {
+                    "date": "2003-01-08",  # typo'd year, should become 2027
+                    "description": "Wifi bill",
+                    "paid_by": "Aisha",
+                    "amount": 1200,
+                    "currency": "INR",
+                    "split_type": "equal",
+                    "split_with": "Aisha;Rohan",
+                    "split_details": None,
+                    "notes": None,
+                },
+            ]
+        )
+        roster = default_roster()
+        analyzed = analyze(raw_rows, roster)
+        wifi = next(r for r in analyzed if r["raw"]["description"] == "Wifi bill")
+        self.assertEqual(wifi["cleaned"]["date"].year, 2027)
+        codes = {a.code for a in wifi["anomalies"]}
+        self.assertIn(A.IMPOSSIBLE_DATE, codes)

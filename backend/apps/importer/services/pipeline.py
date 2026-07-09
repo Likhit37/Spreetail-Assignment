@@ -126,6 +126,27 @@ def _record_alias(member, raw_name):
         )
 
 
+def _resolve_or_create_member(group, roster, raw_name, cache, created):
+    """Map a raw name (payer or settlement recipient) to a Member.
+
+    Mirrors how participants are already handled: a name the roster
+    recognises resolves to its canonical member; a name it doesn't recognise
+    still becomes a real member (flagged as a guest) instead of causing the
+    row to be silently dropped. This is what lets the importer work on data
+    the roster was never seeded for, not just the flat it was written for.
+    Caller is responsible for ensuring `raw_name` is non-blank.
+    """
+    canon = roster.canonical(raw_name)
+    if canon is not None:
+        member = _get_or_create_member(group, canon, cache)
+        created["members"].add(canon)
+    else:
+        member = _get_or_create_member(group, raw_name.strip(), cache, is_guest=True)
+        created["members"].add(raw_name.strip())
+    _record_alias(member, raw_name)
+    return member
+
+
 def _seed_membership_windows(group, roster: Roster, cache):
     for name, window in roster.windows.items():
         if name in cache:
@@ -159,18 +180,22 @@ def commit_batch(batch: ImportBatch, roster: Roster) -> dict:
         cleaned = row.cleaned
         d = _date(res.get("date") or cleaned.get("date"))
         raw_payer = res.get("paid_by") or raw.get("paid_by")
-        payer_name = roster.canonical(raw_payer)
+        raw_payer = str(raw_payer).strip() if raw_payer is not None else ""
 
-        if payer_name is None:
-            # Unresolved missing/unknown payer -> cannot commit this row.
+        if not raw_payer:
+            # No name at all to work with (MISSING_PAYER) -> genuinely blocked
+            # until a human supplies one via row resolution.
             row.status = RowStatus.SKIPPED
             row.save(update_fields=["status"])
             created["skipped"] += 1
             continue
 
-        payer = _get_or_create_member(group, payer_name, cache)
-        _record_alias(payer, raw_payer)
-        created["members"].add(payer_name)
+        # A name is present but may not be in the seeded roster (UNKNOWN_PAYER
+        # on a fresh import, or simply someone new). Treat it the same way an
+        # unrecognised participant is treated: create them as a member rather
+        # than silently dropping the row. This is what makes the importer work
+        # on a dataset whose people the roster was never seeded with.
+        payer = _resolve_or_create_member(group, roster, raw_payer, cache, created)
 
         # Convert amount to INR using the dated rate.
         amount = Decimal(str(cleaned.get("amount")))
@@ -179,14 +204,13 @@ def commit_batch(batch: ImportBatch, roster: Roster) -> dict:
         amount_inr = round_money(amount * rate)
 
         if row.kind == RowKind.SETTLEMENT:
-            to_name = roster.canonical(cleaned.get("settlement_to") or "")
-            if to_name is None:
+            raw_to = cleaned.get("settlement_to") or ""
+            if not raw_to.strip():
                 row.status = RowStatus.SKIPPED
                 row.save(update_fields=["status"])
                 created["skipped"] += 1
                 continue
-            to_member = _get_or_create_member(group, to_name, cache)
-            created["members"].add(to_name)
+            to_member = _resolve_or_create_member(group, roster, raw_to, cache, created)
             Settlement.objects.create(
                 group=group,
                 date=d,

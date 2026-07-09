@@ -118,3 +118,22 @@ Each entry: the decision, the options considered, and why the chosen one won.
   platform. Wired together with a Vite `base`/router `basename` for the Pages
   subpath, a repo-level `VITE_API_BASE` variable, and environment-based CORS on
   the API.
+
+### 17. The roster is the *only* hardcoded domain knowledge — everything else generic
+- **Options:** hardcode names, aliasing, and date logic together as one
+  assignment-specific blob · isolate exactly what can't be derived from data
+  and keep everything else generic.
+- **Chosen:** isolation. `default_roster()` (six names, one genuine alias,
+  Meera/Sam's windows) is deliberately hardcoded because those facts come from
+  a sentence of English in the assignment PDF — no algorithm can derive "Sam
+  moved in mid-April" from the spreadsheet. Everything else that looked
+  hardcoded on inspection turned out to be a bug and was fixed instead of
+  documented as a limitation: (a) casing/whitespace alias matching is generic
+  for any name via `normalize()`, not a per-name lookup; (b) a payer or
+  settlement counterparty the roster doesn't recognise is now created as a
+  guest member instead of the row being silently skipped, matching how
+  unrecognised participants were already handled; (c) `detect_impossible_date`
+  infers the sheet's own dominant year from its data (`_infer_expected_year`)
+  instead of assuming a literal year. `GenericSheetTests` proves all three
+  against a synthetic sheet the roster was never seeded for — including a
+  2027 dataset that self-corrects to 2027, not a hardcoded 2026.
