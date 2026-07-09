@@ -5,6 +5,7 @@ Local dev uses SQLite. Production (Render) uses Postgres via DATABASE_URL.
 Both are relational, satisfying the "relational DBs only" requirement.
 """
 
+from datetime import timedelta
 from pathlib import Path
 import os
 
@@ -130,6 +131,13 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
     ),
+}
+
+# JWT lifetimes. The 5-minute SimpleJWT default is too short for a live demo
+# session, so the access token lasts a few hours (override via ACCESS_TOKEN_HOURS).
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(hours=int(os.getenv("ACCESS_TOKEN_HOURS", "3"))),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
 }
 
 # CORS: allow the deployed frontend + local dev.
