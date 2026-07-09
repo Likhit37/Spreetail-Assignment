@@ -5,6 +5,7 @@ services:
   - type: web
     name: shared-expenses-api
     runtime: python
+    plan: free # $0 tier; without this Render defaults to the paid Starter plan
     rootDir: backend
     buildCommand: "bash build.sh"
     startCommand: "gunicorn config.wsgi:application"
