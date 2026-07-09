@@ -105,8 +105,16 @@ Each entry: the decision, the options considered, and why the chosen one won.
   numbers we already proved, so it cannot invent a balance. With no API key it
   falls back to a deterministic template, so the feature never breaks the demo.
 
-### 16. Deployment — **Render (API + Postgres) + Vercel (frontend)**
-- **Options:** single host · split.
-- **Chosen:** split. Render gives managed Postgres + Python web service via a
-  committed `render.yaml`; Vercel is the natural home for a Vite build. Wired
-  together with environment-based CORS and API base URL.
+### 16. Deployment — **Render (API) + Neon (Postgres) + GitHub Pages (frontend)**
+- **Options:** single host · Render-managed Postgres · Vercel/Koyeb/Hugging Face
+  for the backend · GitHub Pages for the frontend.
+- **Chosen:** split across three free, card-minimal services. Render's own
+  managed Postgres and several container hosts (Koyeb, Hugging Face Docker
+  Spaces) started requiring a card even on their $0 tiers, so Postgres moved to
+  **Neon** (free, card-free) via `DATABASE_URL`, and the backend stayed on
+  **Render**'s free web service (`plan: free` in `render.yaml`, card verified
+  but never charged). The frontend was originally planned for Vercel but moved
+  to **GitHub Pages** — free, no card, and it keeps the whole repo on one
+  platform. Wired together with a Vite `base`/router `basename` for the Pages
+  subpath, a repo-level `VITE_API_BASE` variable, and environment-based CORS on
+  the API.

@@ -1,6 +1,6 @@
-# Render blueprint: Django API (free web service, no card required).
+# Render blueprint: Django API (free web service).
 # Postgres is hosted externally on Neon (free, no card) and supplied via
-# DATABASE_URL. The frontend deploys separately to Vercel (see README).
+# DATABASE_URL. The frontend deploys separately to GitHub Pages (see README).
 services:
   - type: web
     name: shared-expenses-api
@@ -25,7 +25,7 @@ services:
         # Render also injects RENDER_EXTERNAL_HOSTNAME automatically.
         value: ".onrender.com"
       - key: CORS_ALLOWED_ORIGINS
-        sync: false # set to your Vercel URL after the frontend deploys
+        sync: false # set to your GitHub Pages origin, e.g. https://<user>.github.io
       - key: CSRF_TRUSTED_ORIGINS
         sync: false
       - key: FX_PROVIDER_URL

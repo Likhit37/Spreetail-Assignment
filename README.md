@@ -88,7 +88,7 @@ the exact row that triggers it.
   `DATABASE_URL` (Neon), `ALLOWED_HOSTS=.onrender.com`, `FX_PROVIDER_URL`, and
   after the frontend is up, `CORS_ALLOWED_ORIGINS` to the GitHub Pages origin
   (`https://<user>.github.io`). Optional `ANTHROPIC_API_KEY` enables the LLM
-  feature. (A [`Dockerfile`](Dockerfile) is also included for container hosts.)
+  feature.
 - **Frontend → GitHub Pages:** pushing to `main` runs
   [`.github/workflows/deploy-frontend.yml`](.github/workflows/deploy-frontend.yml),
   which builds the Vite app and publishes it to Pages. Set a repo **variable**
